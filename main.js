@@ -1,7 +1,7 @@
-// main.js - Final Version with ES Module fix and Debugging Code
+// main.js - Using PlaywrightCrawler for better anti-bot bypass
 
 import { Actor } from 'apify';
-import { CheerioCrawler, log } from 'crawlee';
+import { PlaywrightCrawler, log } from 'crawlee';
 
 log.info('Actor script started.');
 
@@ -26,43 +26,55 @@ try {
     const proxyConfiguration = await Actor.createProxyConfiguration(proxy);
     log.info('Proxy configuration created.');
 
-    const crawler = new CheerioCrawler({
+    const crawler = new PlaywrightCrawler({
         proxyConfiguration,
-        // The $ object is provided by CheerioCrawler automatically
-        requestHandler: async ({ sendRequest, body, $ }) => {
-            log.info(`Processing messaging page to extract CSRF token.`);
+        // Use headful mode to see the browser in action for debugging (set to true)
+        // For production, keep it false.
+        headless: false,
+        launchContext: {
+            launchOptions: {
+                // Use a common user agent
+                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            },
+        },
+        requestHandler: async ({ page, sendRequest }) => {
+            log.info('Navigating to the LinkedIn messaging page...');
+            
+            // Set cookies before navigating
+            const cookies = cookieString.split('; ').map(c => {
+                const [key, ...value] = c.split('=');
+                return { name: key, value: value.join('='), domain: '.linkedin.com', url: 'https://www.linkedin.com' };
+            });
+            await page.context().addCookies(cookies);
+            log.info('Cookies have been set in the browser context.');
 
-            // --- Start Debugging Code ---
-            log.info('Saving page HTML for debugging...');
-            // This saves the downloaded HTML to the Key-Value Store so we can inspect it.
-            await Actor.setValue('debug_page_body.html', body, { contentType: 'text/html' });
-            log.info('Page HTML saved. You can download it from the "Key-Value Store" tab on the Apify console.');
-            // --- End Debugging Code ---
+            await page.goto('https://www.linkedin.com/messaging/', { waitUntil: 'networkidle' });
+            log.info('Page loaded. Waiting for a moment to ensure all scripts are executed...');
+            await page.waitForTimeout(3000); // Wait for 3 seconds
 
-            // Step 1: Extract CSRF Token from the page's script tags.
-            let csrfToken = null;
-            const csrfRegex = /["']csrfToken["']\s*:\s*["']([^"']+)["']/;
-            const match = body.match(csrfRegex);
+            // Use page.evaluate to run JavaScript inside the browser to find the token
+            const csrfToken = await page.evaluate(() => {
+                // This is the most reliable way to get the token
+                return window.webpackJsonp ? Object.values(window.webpackJsonp).find(arr => arr?.[0]?.[0] === 'csrf-token')?.[0]?.[1] : null;
+            });
 
-            if (match && match[1]) {
-                csrfToken = match[1];
-                log.info('Successfully extracted CSRF token from page script.');
-            } else {
-                // Fallback: Use the provided $ object to search the HTML
-                csrfToken = $('meta[name="csrf-token"]').attr('content');
-                if (csrfToken) {
-                     log.info('Successfully extracted CSRF token from meta tag.');
-                }
-            }
+            // Fallback if the above doesn't work
+            const finalToken = csrfToken || await page.$eval('meta[name="csrf-token"]', el => el.content).catch(() => null);
 
-            if (!csrfToken) {
-                const errorMsg = 'Could not find CSRF token on the page. LinkedIn may have changed its structure or the cookies are invalid/expired.';
+            if (!finalToken) {
+                const errorMsg = 'Could not find CSRF token even with a real browser. The cookies might be invalid or LinkedIn has changed its structure significantly.';
                 log.error(errorMsg);
+                // Take a screenshot for debugging
+                await page.screenshot({ path: 'debug_screenshot.png', fullPage: true });
+                await Actor.setValue('debug_screenshot.png', await page.screenshot({ fullPage: true }), { contentType: 'image/png' });
+                log.error('A screenshot has been saved to Key-Value Store for inspection.');
                 await Actor.pushData({ status: 'FAILED', message: errorMsg });
                 return;
             }
 
-            // Step 2: Make the API call with the full cookie string and CSRF token.
+            log.info(`Successfully extracted CSRF token: ${finalToken.substring(0, 10)}...`);
+
+            // Step 2: Make the API call. Playwright can't directly make this call, so we use sendRequest
             log.info('Sending request to LinkedIn API with CSRF token and full cookies...');
             try {
                 const response = await sendRequest({
@@ -71,7 +83,7 @@ try {
                     responseType: 'json',
                     headers: {
                         'cookie': cookieString,
-                        'csrf-token': csrfToken,
+                        'csrf-token': finalToken,
                         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                         'accept': 'application/vnd.linkedin.normalized+json+2.1',
                         'x-restli-protocol-version': '2.0.0'
@@ -133,7 +145,7 @@ try {
         },
     });
 
-    log.info('Starting the crawler to fetch the messaging page...');
+    log.info('Starting the Playwright crawler to fetch the messaging page...');
     await crawler.run(['https://www.linkedin.com/messaging/']);
     log.info('Crawler finished.');
 
