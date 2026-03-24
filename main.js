@@ -1,4 +1,4 @@
-// main.js - CSRF Token Handling Version
+// main.js - Full Cookie String and Improved CSRF Handling
 
 import { Actor } from 'apify';
 import { CheerioCrawler, log } from 'crawlee';
@@ -13,10 +13,11 @@ try {
     const input = await Actor.getInput();
     log.info('Input received:', input);
 
-    const { liAtCookie, accountOwnerUrl, proxy } = input;
+    // We now expect the full cookie string, not just li_at
+    const { cookieString, accountOwnerUrl, proxy } = input;
 
-    if (!liAtCookie || !accountOwnerUrl) {
-        const errorMsg = `Missing inputs: liAtCookie: ${!!liAtCookie}, accountOwnerUrl: ${!!accountOwnerUrl}`;
+    if (!cookieString || !accountOwnerUrl) {
+        const errorMsg = `Missing inputs: cookieString: ${!!cookieString}, accountOwnerUrl: ${!!accountOwnerUrl}`;
         log.error(errorMsg);
         await Actor.pushData({ status: 'FAILED', message: errorMsg });
         await Actor.exit();
@@ -29,28 +30,43 @@ try {
     const crawler = new CheerioCrawler({
         proxyConfiguration,
         // We need to parse the HTML of the messaging page, so we use Cheerio.
-        requestHandler: async ({ request, sendRequest, $ }) => {
-            log.info(`Processing page: ${request.url}`);
+        requestHandler: async ({ sendRequest, body }) => {
+            log.info(`Processing messaging page to extract CSRF token.`);
 
-            // Step 1: Extract CSRF Token from the messaging page
-            const csrfToken = $('meta[name="csrf-token"]').attr('content');
+            // Step 1: Extract CSRF Token from the page's script tags.
+            // The token is often embedded in a JavaScript variable.
+            let csrfToken = null;
+            const csrfRegex = /["']csrfToken["']\s*:\s*["']([^"']+)["']/;
+            const match = body.match(csrfRegex);
+
+            if (match && match[1]) {
+                csrfToken = match[1];
+                log.info('Successfully extracted CSRF token from page script.');
+            } else {
+                // Fallback: maybe it's in a meta tag after all.
+                const $ = require('cheerio').load(body);
+                csrfToken = $('meta[name="csrf-token"]').attr('content');
+                if (csrfToken) {
+                     log.info('Successfully extracted CSRF token from meta tag.');
+                }
+            }
+
             if (!csrfToken) {
-                const errorMsg = 'Could not find CSRF token on the page. LinkedIn may have changed its structure.';
+                const errorMsg = 'Could not find CSRF token on the page. LinkedIn may have changed its structure or the cookies are invalid/expired.';
                 log.error(errorMsg);
                 await Actor.pushData({ status: 'FAILED', message: errorMsg });
                 return;
             }
-            log.info('Successfully extracted CSRF token.');
 
-            // Step 2: Make the API call with the CSRF token
-            log.info('Sending request to LinkedIn API with CSRF token...');
+            // Step 2: Make the API call with the full cookie string and CSRF token.
+            log.info('Sending request to LinkedIn API with CSRF token and full cookies...');
             try {
                 const response = await sendRequest({
                     url: 'https://www.linkedin.com/voyager/api/messaging/conversations?count=20&q=all',
                     method: 'GET',
                     responseType: 'json',
                     headers: {
-                        'cookie': `li_at=${liAtCookie}`,
+                        'cookie': cookieString, // <-- Use the full string here
                         'csrf-token': csrfToken, // <-- The crucial new header
                         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                         'accept': 'application/vnd.linkedin.normalized+json+2.1',
