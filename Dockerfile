@@ -1,24 +1,27 @@
-# في ملف Dockerfile، استخدم هذه الصورة بدلاً من الحالية
-FROM mcr.microsoft.com/playwright:v1.42.1-noble
-# Step 2: Set the user to root to install dependencies without permission issues
-USER root
+# === ملف Dockerfile ===
 
-# Step 3: Copy your package.json file first to leverage Docker cache
+# استخدم صورة Playwright رسمية بإصدار محدد ومتوافق
+# هذا الإصدار يجب أن يتطابق مع الإصدار في ملف package.json
+FROM mcr.microsoft.com/playwright:v1.58.2
+
+# قم بتعيين مجلد العمل داخل الحاوية
+WORKDIR /usr/src/app
+
+# انسخ ملفات إدارة الحزم (package.json و package-lock.json) أولاً
+# هذا يستفيد من خاصية التخزين المؤقت في Docker (Docker layer caching)
+# حيث لن يتم إعادة تثبيت الحزم إلا إذا تغيرت هذه الملفات
 COPY package*.json ./
 
-# Step 4: Install Node.js dependencies
-RUN npm install
+# قم بتثبيت اعتماديات المشروع
+# نستخدم 'npm ci' لأنه أسرع وأكثر موثوقية في بيئات الإنتاج
+RUN npm ci
 
-# Step 5: Install the Playwright browser binaries.
-# This is crucial because npm install only installs the library, not the browsers.
-RUN npx playwright install
-
-# Step 6: Copy the rest of your source code (like main.js)
+# انسخ باقي ملفات المشروع إلى مجلد العمل
 COPY . .
 
-# Step 7: IMPORTANT: Switch back to the non-root user for security.
-# The Apify base images use a user named 'myuser'.
-USER myuser
+# استخدم المستخدم 'playwright' الموجود مسبقاً في الصورة الرسمية
+# هذا أفضل من التشغيل كمستخدم جذر (root) من ناحية الأمان
+USER playwright
 
-# Step 8: Set the command to run your actor when the container starts
+# الأمر الافتراضي الذي سيتم تشغيله عند بدء الحاوية
 CMD [ "npm", "start" ]
