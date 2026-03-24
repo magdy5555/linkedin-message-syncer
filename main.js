@@ -1,4 +1,4 @@
-// main.js - Enhanced Logging Version
+// main.js - Final Corrected Version
 
 import { Actor } from 'apify';
 import { CheerioCrawler, log } from 'crawlee';
@@ -20,7 +20,6 @@ try {
         log.error(errorMsg);
         await Actor.pushData({ status: 'FAILED', message: errorMsg });
         await Actor.exit();
-        // The problematic 'return;' statement has been removed.
     }
 
     log.info('Inputs are valid. Creating proxy configuration...');
@@ -29,14 +28,7 @@ try {
 
     const crawler = new CheerioCrawler({
         proxyConfiguration,
-        additionalHttpConfigs: {
-            headers: {
-                'cookie': `li_at=${liAtCookie}`,
-                'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                'accept': 'application/vnd.linkedin.normalized+json+2.1',
-                'x-restli-protocol-version': '2.0.0'
-            }
-        },
+        // 'additionalHttpConfigs' has been removed from here.
         requestHandler: async ({ sendRequest }) => {
             log.info(`🔄 Syncing messages for account: ${accountOwnerUrl}`);
 
@@ -45,7 +37,14 @@ try {
                 const response = await sendRequest({
                     url: 'https://www.linkedin.com/voyager/api/messaging/conversations?count=20&q=all',
                     method: 'GET',
-                    responseType: 'json'
+                    responseType: 'json',
+                    // Headers are now correctly placed here.
+                    headers: {
+                        'cookie': `li_at=${liAtCookie}`,
+                        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                        'accept': 'application/vnd.linkedin.normalized+json+2.1',
+                        'x-restli-protocol-version': '2.0.0'
+                    }
                 });
 
                 log.info(`Received response with status: ${response.status}`);
