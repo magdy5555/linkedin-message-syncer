@@ -16,6 +16,7 @@
       "title": "Account Owner LinkedIn Profile URL",
       "type": "string",
       "description": "The URL of your own LinkedIn profile. This is used to distinguish your messages from replies.",
+      "editor": "textfield",
       "prefill": "https://www.linkedin.com/in/your-profile/",
       "example": "https://www.linkedin.com/in/your-profile/"
     },
