@@ -1,14 +1,16 @@
-# Step 1: Use the official Apify image that includes Node.js and Playwright
-FROM apify/actor-node-playwright
+FROM apify/actor-node-playwright:20
 
-# Step 2: Copy your package.json file first to leverage Docker cache
+# ضبط مجلد العمل
+WORKDIR /usr/src/app
+
+# نسخ الملفات الأساسية أولاً
 COPY package*.json ./
 
-# Step 3: Install Node.js dependencies
-RUN npm install
+# تثبيت المكتبات (نحن نستخدم الصورة الرسمية فهي مجهزة بالـ Browsers)
+RUN npm install --omit=dev --audit=false
 
-# Step 4: Copy the rest of your source code (like main.js)
-COPY . .
+# نسخ باقي الكود
+COPY . ./
 
-# Step 5: Set the command to run your actor when the container starts
-CMD [ "npm", "start" ]
+# تشغيل الأكتور
+CMD ["npm", "start"]
