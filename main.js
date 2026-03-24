@@ -1,4 +1,4 @@
-// main.js - Final Version with ES Module fix
+// main.js - Final Version with ES Module fix and Debugging Code
 
 import { Actor } from 'apify';
 import { CheerioCrawler, log } from 'crawlee';
@@ -31,6 +31,13 @@ try {
         // The $ object is provided by CheerioCrawler automatically
         requestHandler: async ({ sendRequest, body, $ }) => {
             log.info(`Processing messaging page to extract CSRF token.`);
+
+            // --- Start Debugging Code ---
+            log.info('Saving page HTML for debugging...');
+            // This saves the downloaded HTML to the Key-Value Store so we can inspect it.
+            await Actor.setValue('debug_page_body.html', body, { contentType: 'text/html' });
+            log.info('Page HTML saved. You can download it from the "Key-Value Store" tab on the Apify console.');
+            // --- End Debugging Code ---
 
             // Step 1: Extract CSRF Token from the page's script tags.
             let csrfToken = null;
