@@ -1,6 +1,5 @@
-# Step 1: Use the official Apify image that includes Node.js and Playwright
-FROM apify/actor-node-playwright
-
+# في ملف Dockerfile، استخدم هذه الصورة بدلاً من الحالية
+FROM mcr.microsoft.com/playwright:v1.42.1-noble
 # Step 2: Set the user to root to install dependencies without permission issues
 USER root
 
