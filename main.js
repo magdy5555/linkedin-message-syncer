@@ -20,7 +20,7 @@ try {
         log.error(errorMsg);
         await Actor.pushData({ status: 'FAILED', message: errorMsg });
         await Actor.exit();
-        return;
+        // The problematic 'return;' statement has been removed.
     }
 
     log.info('Inputs are valid. Creating proxy configuration...');
