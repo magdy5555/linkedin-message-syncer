@@ -1,4 +1,4 @@
-// main.js - Full Cookie String and Improved CSRF Handling
+// main.js - Final Version with ES Module fix
 
 import { Actor } from 'apify';
 import { CheerioCrawler, log } from 'crawlee';
@@ -13,7 +13,6 @@ try {
     const input = await Actor.getInput();
     log.info('Input received:', input);
 
-    // We now expect the full cookie string, not just li_at
     const { cookieString, accountOwnerUrl, proxy } = input;
 
     if (!cookieString || !accountOwnerUrl) {
@@ -29,12 +28,11 @@ try {
 
     const crawler = new CheerioCrawler({
         proxyConfiguration,
-        // We need to parse the HTML of the messaging page, so we use Cheerio.
-        requestHandler: async ({ sendRequest, body }) => {
+        // The $ object is provided by CheerioCrawler automatically
+        requestHandler: async ({ sendRequest, body, $ }) => {
             log.info(`Processing messaging page to extract CSRF token.`);
 
             // Step 1: Extract CSRF Token from the page's script tags.
-            // The token is often embedded in a JavaScript variable.
             let csrfToken = null;
             const csrfRegex = /["']csrfToken["']\s*:\s*["']([^"']+)["']/;
             const match = body.match(csrfRegex);
@@ -43,8 +41,7 @@ try {
                 csrfToken = match[1];
                 log.info('Successfully extracted CSRF token from page script.');
             } else {
-                // Fallback: maybe it's in a meta tag after all.
-                const $ = require('cheerio').load(body);
+                // Fallback: Use the provided $ object to search the HTML
                 csrfToken = $('meta[name="csrf-token"]').attr('content');
                 if (csrfToken) {
                      log.info('Successfully extracted CSRF token from meta tag.');
@@ -66,8 +63,8 @@ try {
                     method: 'GET',
                     responseType: 'json',
                     headers: {
-                        'cookie': cookieString, // <-- Use the full string here
-                        'csrf-token': csrfToken, // <-- The crucial new header
+                        'cookie': cookieString,
+                        'csrf-token': csrfToken,
                         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                         'accept': 'application/vnd.linkedin.normalized+json+2.1',
                         'x-restli-protocol-version': '2.0.0'
@@ -130,7 +127,6 @@ try {
     });
 
     log.info('Starting the crawler to fetch the messaging page...');
-    // The crawler will first visit this page to get the token.
     await crawler.run(['https://www.linkedin.com/messaging/']);
     log.info('Crawler finished.');
 
