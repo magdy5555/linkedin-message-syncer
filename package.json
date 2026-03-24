@@ -1,18 +1,24 @@
 {
   "name": "vocout-linkedin-message-sync",
   "version": "0.0.1",
-  "description": "An actor to sync LinkedIn messages using Playwright.",
-  "type": "module",
+  "description": "An Apify actor to sync LinkedIn messages using Playwright.",
   "main": "main.js",
-  "author": "Magdy Hassan",
-  "license": "ISC",
-  "dependencies": {
-    "apify": "^3.1.10",
-    "crawlee": "^3.16.0",
-    "playwright": "1.42.1",
-    "@crawlee/playwright": "^3.16.0"
-  },
   "scripts": {
     "start": "node main.js"
-  }
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "apify": "^3.7.0",
+    "@crawlee/playwright": "^3.16.0",
+    "playwright": "^1.58.2"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "apify",
+    "linkedin",
+    "playwright",
+    "crawler",
+    "messages"
+  ]
 }
